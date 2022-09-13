@@ -17,6 +17,7 @@
 package org.apache.rocketmq.broker.processor;
 
 import io.netty.channel.ChannelHandlerContext;
+
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.HashMap;
@@ -67,12 +68,12 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
     public AbstractSendMessageProcessor(final BrokerController brokerController) {
         this.brokerController = brokerController;
         this.storeHost =
-            new InetSocketAddress(brokerController.getBrokerConfig().getBrokerIP1(), brokerController
-                .getNettyServerConfig().getListenPort());
+                new InetSocketAddress(brokerController.getBrokerConfig().getBrokerIP1(), brokerController
+                        .getNettyServerConfig().getListenPort());
     }
 
     protected SendMessageContext buildMsgContext(ChannelHandlerContext ctx,
-        SendMessageRequestHeader requestHeader) {
+                                                 SendMessageRequestHeader requestHeader) {
         if (!this.hasSendMessageHook()) {
             return null;
         }
@@ -105,7 +106,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
     }
 
     protected MessageExtBrokerInner buildInnerMsg(final ChannelHandlerContext ctx,
-        final SendMessageRequestHeader requestHeader, final byte[] body, TopicConfig topicConfig) {
+                                                  final SendMessageRequestHeader requestHeader, final byte[] body, TopicConfig topicConfig) {
         int queueIdInt = requestHeader.getQueueId();
         if (queueIdInt < 0) {
             queueIdInt = ThreadLocalRandom.current().nextInt(99999999) % topicConfig.getWriteQueueNums();
@@ -121,10 +122,10 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
         msgInner.setBody(body);
         msgInner.setFlag(requestHeader.getFlag());
         MessageAccessor.setProperties(msgInner,
-            MessageDecoder.string2messageProperties(requestHeader.getProperties()));
+                MessageDecoder.string2messageProperties(requestHeader.getProperties()));
         msgInner.setPropertiesString(requestHeader.getProperties());
         msgInner.setTagsCode(MessageExtBrokerInner.tagsString2tagsCode(topicConfig.getTopicFilterType(),
-            msgInner.getTags()));
+                msgInner.getTags()));
 
         msgInner.setQueueId(queueIdInt);
         msgInner.setSysFlag(sysFlag);
@@ -132,7 +133,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
         msgInner.setBornHost(ctx.channel().remoteAddress());
         msgInner.setStoreHost(this.getStoreHost());
         msgInner.setReconsumeTimes(requestHeader.getReconsumeTimes() == null ? 0 : requestHeader
-            .getReconsumeTimes());
+                .getReconsumeTimes());
         return msgInner;
     }
 
@@ -141,8 +142,8 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
     }
 
     protected RemotingCommand msgContentCheck(final ChannelHandlerContext ctx,
-        final SendMessageRequestHeader requestHeader, RemotingCommand request,
-        final RemotingCommand response) {
+                                              final SendMessageRequestHeader requestHeader, RemotingCommand request,
+                                              final RemotingCommand response) {
         if (requestHeader.getTopic().length() > Byte.MAX_VALUE) {
             log.warn("putMessage message topic length too long {}", requestHeader.getTopic().length());
             response.setCode(ResponseCode.MESSAGE_ILLEGAL);
@@ -155,7 +156,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
         }
         if (request.getBody().length > DBMsgConstants.MAX_BODY_SIZE) {
             log.warn(" topic {}  msg body size {}  from {}", requestHeader.getTopic(),
-                request.getBody().length, ChannelUtil.getRemoteIp(ctx.channel()));
+                    request.getBody().length, ChannelUtil.getRemoteIp(ctx.channel()));
             response.setRemark("msg body must be less 64KB");
             response.setCode(ResponseCode.MESSAGE_ILLEGAL);
             return response;
@@ -163,25 +164,33 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
         return response;
     }
 
+    /**
+     * AbstractSendMessageProcessor的方法
+     * <p>
+     * 消息校验，包括自动创建topic的逻辑
+     */
     protected RemotingCommand msgCheck(final ChannelHandlerContext ctx,
-        final SendMessageRequestHeader requestHeader, final RemotingCommand response) {
+                                       final SendMessageRequestHeader requestHeader, final RemotingCommand response) {
+        //如果当前broker没有写的权限，那么broker会返回一个NO_PERMISSION异常，sending message is forbidden，禁止向该broker发送消息
         if (!PermName.isWriteable(this.brokerController.getBrokerConfig().getBrokerPermission())
-            && this.brokerController.getTopicConfigManager().isOrderTopic(requestHeader.getTopic())) {
+                && this.brokerController.getTopicConfigManager().isOrderTopic(requestHeader.getTopic())) {
             response.setCode(ResponseCode.NO_PERMISSION);
             response.setRemark("the broker[" + this.brokerController.getBrokerConfig().getBrokerIP1()
-                + "] sending message is forbidden");
+                    + "] sending message is forbidden");
             return response;
         }
-
+        //校验topic不能为空，必须属于合法字符regex: ^[%|a-zA-Z0-9_-]+$，且长度不超过127个字符
         if (!TopicValidator.validateTopic(requestHeader.getTopic(), response)) {
             return response;
         }
+        //校验如果当前topic是不为允许使用的系统topic，那么抛出异常，默认不能为SCHEDULE_TOPIC_XXXX
         if (TopicValidator.isNotAllowedSendTopic(requestHeader.getTopic(), response)) {
             return response;
         }
-
+        //从broker的topicConfigTable缓存中根据topicName获取TopicConfig
         TopicConfig topicConfig =
-            this.brokerController.getTopicConfigManager().selectTopicConfig(requestHeader.getTopic());
+                this.brokerController.getTopicConfigManager().selectTopicConfig(requestHeader.getTopic());
+        //如果不存在该topic信息
         if (null == topicConfig) {
             int topicSysFlag = 0;
             if (requestHeader.isUnitMode()) {
@@ -193,36 +202,41 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
             }
 
             log.warn("the topic {} not exist, producer: {}", requestHeader.getTopic(), ctx.channel().remoteAddress());
+            /*
+             * 尝试创建普通topic
+             */
             topicConfig = this.brokerController.getTopicConfigManager().createTopicInSendMessageMethod(
-                requestHeader.getTopic(),
-                requestHeader.getDefaultTopic(),
-                RemotingHelper.parseChannelRemoteAddr(ctx.channel()),
-                requestHeader.getDefaultTopicQueueNums(), topicSysFlag);
-
+                    requestHeader.getTopic(),
+                    requestHeader.getDefaultTopic(),
+                    RemotingHelper.parseChannelRemoteAddr(ctx.channel()),
+                    requestHeader.getDefaultTopicQueueNums(), topicSysFlag);
+            /*
+             * 尝试创建重试topic
+             */
             if (null == topicConfig) {
                 if (requestHeader.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
                     topicConfig =
-                        this.brokerController.getTopicConfigManager().createTopicInSendMessageBackMethod(
-                            requestHeader.getTopic(), 1, PermName.PERM_WRITE | PermName.PERM_READ,
-                            topicSysFlag);
+                            this.brokerController.getTopicConfigManager().createTopicInSendMessageBackMethod(
+                                    requestHeader.getTopic(), 1, PermName.PERM_WRITE | PermName.PERM_READ,
+                                    topicSysFlag);
                 }
             }
 
             if (null == topicConfig) {
                 response.setCode(ResponseCode.TOPIC_NOT_EXIST);
                 response.setRemark("topic[" + requestHeader.getTopic() + "] not exist, apply first please!"
-                    + FAQUrl.suggestTodo(FAQUrl.APPLY_TOPIC_URL));
+                        + FAQUrl.suggestTodo(FAQUrl.APPLY_TOPIC_URL));
                 return response;
             }
         }
-
+        //校验queutId 不能大于等于该broker的读或写的最大数量
         int queueIdInt = requestHeader.getQueueId();
         int idValid = Math.max(topicConfig.getWriteQueueNums(), topicConfig.getReadQueueNums());
         if (queueIdInt >= idValid) {
             String errorInfo = String.format("request queueId[%d] is illegal, %s Producer: %s",
-                queueIdInt,
-                topicConfig.toString(),
-                RemotingHelper.parseChannelRemoteAddr(ctx.channel()));
+                    queueIdInt,
+                    topicConfig.toString(),
+                    RemotingHelper.parseChannelRemoteAddr(ctx.channel()));
 
             log.warn(errorInfo);
             response.setCode(ResponseCode.SYSTEM_ERROR);
@@ -238,7 +252,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
     }
 
     protected void doResponse(ChannelHandlerContext ctx, RemotingCommand request,
-        final RemotingCommand response) {
+                              final RemotingCommand response) {
         if (!request.isOnewayRPC()) {
             try {
                 ctx.writeAndFlush(response);
@@ -251,7 +265,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
     }
 
     public void executeSendMessageHookBefore(final ChannelHandlerContext ctx, final RemotingCommand request,
-        SendMessageContext context) {
+                                             SendMessageContext context) {
         if (hasSendMessageHook()) {
             for (SendMessageHook hook : this.sendMessageHookList) {
                 try {
@@ -280,21 +294,30 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
         }
     }
 
+    /**
+     * AbstractSendMessageProcessor的方法
+     * <p>
+     * 解析消息请求头
+     */
     protected SendMessageRequestHeader parseRequestHeader(RemotingCommand request)
-        throws RemotingCommandException {
+            throws RemotingCommandException {
 
         SendMessageRequestHeaderV2 requestHeaderV2 = null;
         SendMessageRequestHeader requestHeader = null;
+        //根据RequestCode解析为不同类型的请求头对象
         switch (request.getCode()) {
             case RequestCode.SEND_BATCH_MESSAGE:
             case RequestCode.SEND_MESSAGE_V2:
+                //如果是SEND_BATCH_MESSAGE和SEND_MESSAGE_V2，那么解析为SendMessageRequestHeaderV2，即轻量级请求头
                 requestHeaderV2 = decodeSendMessageHeaderV2(request);
             case RequestCode.SEND_MESSAGE:
                 if (null == requestHeaderV2) {
+                    //解析为SendMessageRequestHeader，即普通请求头
                     requestHeader =
-                        (SendMessageRequestHeader) request
-                            .decodeCommandCustomHeader(SendMessageRequestHeader.class);
+                            (SendMessageRequestHeader) request
+                                    .decodeCommandCustomHeader(SendMessageRequestHeader.class);
                 } else {
+                    //将v2转换为v1，即普通的SendMessageRequestHeader
                     requestHeader = SendMessageRequestHeaderV2.createSendMessageRequestHeaderV1(requestHeaderV2);
                 }
             default:
@@ -382,7 +405,7 @@ public abstract class AbstractSendMessageProcessor extends AsyncNettyRequestProc
                 try {
                     if (response != null) {
                         final SendMessageResponseHeader responseHeader =
-                            (SendMessageResponseHeader) response.readCustomHeader();
+                                (SendMessageResponseHeader) response.readCustomHeader();
                         context.setMsgId(responseHeader.getMsgId());
                         context.setQueueId(responseHeader.getQueueId());
                         context.setQueueOffset(responseHeader.getQueueOffset());

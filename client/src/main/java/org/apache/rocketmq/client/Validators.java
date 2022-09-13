@@ -53,39 +53,49 @@ public class Validators {
         }
     }
 
+    /**
+     * Validators的方法
+     */
     public static void checkMessage(Message msg, DefaultMQProducer defaultMQProducer) throws MQClientException {
+        //如果消息为null，抛出异常
         if (null == msg) {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, "the message is null");
         }
-        // topic
+        /*
+         * 校验topic
+         */
+        //如果topic为空，或者长度大于127个字符，或者topic的字符串不符合 "^[%|a-zA-Z0-9_-]+$"模式，即包含非法字符，那么抛出异常
         Validators.checkTopic(msg.getTopic());
+        //如果当前topic是不为允许使用的系统topic，那么抛出异常
         Validators.isNotAllowedSendTopic(msg.getTopic());
 
         // body
+        //如果消息体为null，那么抛出异常
         if (null == msg.getBody()) {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, "the message body is null");
         }
-
+        //如果消息体为空数组，那么抛出异常
         if (0 == msg.getBody().length) {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, "the message body length is zero");
         }
-
+        //如果消息 字节数组长度大于4,194,304，即消息的大小大于4M，那么抛出异常
         if (msg.getBody().length > defaultMQProducer.getMaxMessageSize()) {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL,
-                "the message body size over max value, MAX: " + defaultMQProducer.getMaxMessageSize());
+                    "the message body size over max value, MAX: " + defaultMQProducer.getMaxMessageSize());
         }
     }
 
     public static void checkTopic(String topic) throws MQClientException {
+        //如果topic为空，那么抛出异常
         if (UtilAll.isBlank(topic)) {
             throw new MQClientException("The specified topic is blank", null);
         }
-
+        //如果topic长度大于127个字符，那么抛出异常
         if (topic.length() > TOPIC_MAX_LENGTH) {
             throw new MQClientException(
-                String.format("The specified topic is longer than topic max length %d.", TOPIC_MAX_LENGTH), null);
+                    String.format("The specified topic is longer than topic max length %d.", TOPIC_MAX_LENGTH), null);
         }
-
+        //如果topic字符串包含非法字符，那么抛出异常
         if (isTopicOrGroupIllegal(topic)) {
             throw new MQClientException(String.format(
                     "The specified topic[%s] contains illegal characters, allowing only %s", topic,

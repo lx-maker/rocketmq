@@ -38,4 +38,8 @@ public class MessageSysFlag {
         return flag & (~COMPRESSED_FLAG);
     }
 
+    public static void main( String[] args ){
+
+        System.out.println( 0x3 << 2 );
+    }
 }

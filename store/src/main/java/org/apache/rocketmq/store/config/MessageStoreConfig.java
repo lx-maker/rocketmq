@@ -32,7 +32,7 @@ public class MessageStoreConfig {
     //The directory in which the commitlog is kept
     @ImportantField
     private String storePathCommitLog = System.getProperty("user.home") + File.separator + "store"
-        + File.separator + "commitlog";
+            + File.separator + "commitlog";
 
     private String readOnlyCommitLogStorePaths = null;
 
@@ -637,14 +637,13 @@ public class MessageStoreConfig {
     }
 
     /**
-     * Enable transient commitLog store pool only if transientStorePoolEnable is true and the FlushDiskType is
-     * ASYNC_FLUSH
-     *
-     * @return <tt>true</tt> or <tt>false</tt>
+     * MessageStoreConfig的方法
+     * <p>
+     * 仅当transientStorePoolEnable为true（默认false）且FlushDiskType为ASYNC_FLUSH且当前broker不是SLAVE角色时，才启用commitLog临时存储池
      */
     public boolean isTransientStorePoolEnable() {
         return transientStorePoolEnable && FlushDiskType.ASYNC_FLUSH == getFlushDiskType()
-            && BrokerRole.SLAVE != getBrokerRole();
+                && BrokerRole.SLAVE != getBrokerRole();
     }
 
     public void setTransientStorePoolEnable(final boolean transientStorePoolEnable) {
@@ -706,6 +705,7 @@ public class MessageStoreConfig {
     public void setReadOnlyCommitLogStorePaths(String readOnlyCommitLogStorePaths) {
         this.readOnlyCommitLogStorePaths = readOnlyCommitLogStorePaths;
     }
+
     public String getdLegerGroup() {
         return dLegerGroup;
     }

@@ -115,7 +115,7 @@ public class TopicRouteData extends RemotingSerializable {
                 return false;
         } else if (!orderTopicConf.equals(other.orderTopicConf))
             return false;
-        if (queueDatas == null) {
+            if (queueDatas == null) {
             if (other.queueDatas != null)
                 return false;
         } else if (!queueDatas.equals(other.queueDatas))

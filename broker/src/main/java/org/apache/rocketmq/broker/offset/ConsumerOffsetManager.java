@@ -24,6 +24,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+
 import org.apache.rocketmq.broker.BrokerController;
 import org.apache.rocketmq.broker.BrokerPathConfigHelper;
 import org.apache.rocketmq.common.ConfigManager;
@@ -38,7 +39,7 @@ public class ConsumerOffsetManager extends ConfigManager {
     protected static final String TOPIC_GROUP_SEPARATOR = "@";
 
     protected ConcurrentMap<String/* topic@group */, ConcurrentMap<Integer, Long>> offsetTable =
-        new ConcurrentHashMap<String, ConcurrentMap<Integer, Long>>(512);
+            new ConcurrentHashMap<String, ConcurrentMap<Integer, Long>>(512);
 
     protected transient BrokerController brokerController;
 
@@ -60,7 +61,7 @@ public class ConsumerOffsetManager extends ConfigManager {
                 String group = arrays[1];
 
                 if (null == brokerController.getConsumerManager().findSubscriptionData(group, topic)
-                    && this.offsetBehindMuchThanData(topic, next.getValue())) {
+                        && this.offsetBehindMuchThanData(topic, next.getValue())) {
                     it.remove();
                     log.warn("remove topic offset, {}", topicAtGroup);
                 }
@@ -118,20 +119,42 @@ public class ConsumerOffsetManager extends ConfigManager {
         return groups;
     }
 
+    /**
+     * ConsumerOffsetManager的方法
+     * 提交偏移量
+     *
+     * @param clientHost 客户端地址
+     * @param group      消费者组
+     * @param topic      消费topic
+     * @param queueId    队列id
+     * @param offset     提交的偏移量
+     */
     public void commitOffset(final String clientHost, final String group, final String topic, final int queueId,
-        final long offset) {
+                             final long offset) {
         // topic@group
         String key = topic + TOPIC_GROUP_SEPARATOR + group;
         this.commitOffset(clientHost, key, queueId, offset);
     }
 
+    /**
+     * ConsumerOffsetManager的方法
+     * 提交偏移量
+     *
+     * @param clientHost 客户端地址
+     * @param key        缓存key
+     * @param queueId    队列id
+     * @param offset     提交的偏移量
+     */
     private void commitOffset(final String clientHost, final String key, final int queueId, final long offset) {
+        //获取topic@group对应的所有queue的消费偏移量map
         ConcurrentMap<Integer, Long> map = this.offsetTable.get(key);
         if (null == map) {
             map = new ConcurrentHashMap<Integer, Long>(32);
+            //存入map，key为queueId value为offSet
             map.put(queueId, offset);
             this.offsetTable.put(key, map);
         } else {
+            //存入map，key为queueId value为offSet
             Long storeOffset = map.put(queueId, offset);
             if (storeOffset != null && offset < storeOffset) {
                 log.warn("[NOTIFYME]update consumer offset less than store. clientHost={}, key={}, queueId={}, requestOffset={}, storeOffset={}", clientHost, key, queueId, offset, storeOffset);

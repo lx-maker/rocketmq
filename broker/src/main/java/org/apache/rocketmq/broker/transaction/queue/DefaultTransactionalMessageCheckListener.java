@@ -39,16 +39,25 @@ public class DefaultTransactionalMessageCheckListener extends AbstractTransactio
         super();
     }
 
+    /**
+     * DefaultTransactionalMessageCheckListener的方法
+     * <p>
+     * 丢弃half消息
+     *
+     * @param msgExt 需要丢弃的half消息
+     */
     @Override
     public void resolveDiscardMsg(MessageExt msgExt) {
         log.error("MsgExt:{} has been checked too many times, so discard it by moving it to system topic TRANS_CHECK_MAXTIME_TOPIC", msgExt);
 
         try {
+            //half消息转换为内部消息对象，topic为TRANS_CHECK_MAX_TIME_TOPIC
             MessageExtBrokerInner brokerInner = toMessageExtBrokerInner(msgExt);
+            //将消息存入该topic
             PutMessageResult putMessageResult = this.getBrokerController().getMessageStore().putMessage(brokerInner);
             if (putMessageResult != null && putMessageResult.getPutMessageStatus() == PutMessageStatus.PUT_OK) {
                 log.info("Put checked-too-many-time half message to TRANS_CHECK_MAXTIME_TOPIC OK. Restored in queueOffset={}, " +
-                    "commitLogOffset={}, real topic={}", msgExt.getQueueOffset(), msgExt.getCommitLogOffset(), msgExt.getUserProperty(MessageConst.PROPERTY_REAL_TOPIC));
+                        "commitLogOffset={}, real topic={}", msgExt.getQueueOffset(), msgExt.getCommitLogOffset(), msgExt.getUserProperty(MessageConst.PROPERTY_REAL_TOPIC));
             } else {
                 log.error("Put checked-too-many-time half message to TRANS_CHECK_MAXTIME_TOPIC failed, real topic={}, msgId={}", msgExt.getTopic(), msgExt.getMsgId());
             }
@@ -58,8 +67,15 @@ public class DefaultTransactionalMessageCheckListener extends AbstractTransactio
 
     }
 
+    /**
+     * DefaultTransactionalMessageCheckListener的方法
+     * @param msgExt half消息
+     * @return 内部消息对象
+     */
     private MessageExtBrokerInner toMessageExtBrokerInner(MessageExt msgExt) {
+        //创建或者获取topic信息，被丢弃的half消息将会存入TRANS_CHECK_MAX_TIME_TOPIC这个固定的topic
         TopicConfig topicConfig = this.getBrokerController().getTopicConfigManager().createTopicOfTranCheckMaxTime(TCMT_QUEUE_NUMS, PermName.PERM_READ | PermName.PERM_WRITE);
+        //默认只有一个队列，所以queueId固定为0
         int queueId = ThreadLocalRandom.current().nextInt(99999999) % TCMT_QUEUE_NUMS;
         MessageExtBrokerInner inner = new MessageExtBrokerInner();
         inner.setTopic(topicConfig.getTopicName());

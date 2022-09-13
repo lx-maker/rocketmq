@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.rocketmq.client.exception.MQBrokerException;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.impl.factory.MQClientInstance;
@@ -41,27 +42,35 @@ import org.apache.rocketmq.remoting.exception.RemotingException;
  */
 public class LocalFileOffsetStore implements OffsetStore {
     public final static String LOCAL_OFFSET_STORE_DIR = System.getProperty(
-        "rocketmq.client.localOffsetStoreDir",
-        System.getProperty("user.home") + File.separator + ".rocketmq_offsets");
+            "rocketmq.client.localOffsetStoreDir",
+            System.getProperty("user.home") + File.separator + ".rocketmq_offsets");
     private final static InternalLogger log = ClientLogger.getLog();
     private final MQClientInstance mQClientFactory;
     private final String groupName;
     private final String storePath;
     private ConcurrentMap<MessageQueue, AtomicLong> offsetTable =
-        new ConcurrentHashMap<MessageQueue, AtomicLong>();
+            new ConcurrentHashMap<MessageQueue, AtomicLong>();
 
     public LocalFileOffsetStore(MQClientInstance mQClientFactory, String groupName) {
         this.mQClientFactory = mQClientFactory;
         this.groupName = groupName;
         this.storePath = LOCAL_OFFSET_STORE_DIR + File.separator +
-            this.mQClientFactory.getClientId() + File.separator +
-            this.groupName + File.separator +
-            "offsets.json";
+                this.mQClientFactory.getClientId() + File.separator +
+                this.groupName + File.separator +
+                "offsets.json";
     }
 
+    /**
+     * LocalFileOffsetStore
+     * <p>
+     * 广播消费模式下，从本地文件恢复offset配置。
+     */
     @Override
     public void load() throws MQClientException {
+        //加载本地offset文件 地址为{user.home}/.rocketmq_offsets/{clientId}/{groupName}/offsets.json
+        //配置在文件中以json形式存在
         OffsetSerializeWrapper offsetSerializeWrapper = this.readLocalOffset();
+
         if (offsetSerializeWrapper != null && offsetSerializeWrapper.getOffsetTable() != null) {
             offsetTable.putAll(offsetSerializeWrapper.getOffsetTable());
 
@@ -93,29 +102,52 @@ public class LocalFileOffsetStore implements OffsetStore {
         }
     }
 
+    /**
+     * LocalFileOffsetStore的方法
+     * <p>
+     * 获取offset
+     *
+     * @param mq   需要获取offset的mq
+     * @param type 读取类型
+     */
     @Override
     public long readOffset(final MessageQueue mq, final ReadOffsetType type) {
         if (mq != null) {
             switch (type) {
+                /*
+                 * 先从本地内存offsetTable读取，读不到再从broker中读取
+                 */
                 case MEMORY_FIRST_THEN_STORE:
+                    /*
+                     * 仅从本地内存offsetTable读取
+                     */
                 case READ_FROM_MEMORY: {
                     AtomicLong offset = this.offsetTable.get(mq);
                     if (offset != null) {
+                        //如果本地内存有关于此mq的offset，那么直接返回
                         return offset.get();
                     } else if (ReadOffsetType.READ_FROM_MEMORY == type) {
+                        //如果本地内存没有关于此mq的offset，但那读取类型为READ_FROM_MEMORY，那么直接返回-1
                         return -1;
                     }
                 }
+                /*
+                 * 仅从本地文件中读取
+                 */
                 case READ_FROM_STORE: {
                     OffsetSerializeWrapper offsetSerializeWrapper;
                     try {
+                        //加载本地offset文件 地址为{user.home}/.rocketmq_offsets/{clientId}/{groupName}/offsets.json
+                        //配置在文件中以json形式存在
                         offsetSerializeWrapper = this.readLocalOffset();
                     } catch (MQClientException e) {
                         return -1;
                     }
+                    //获取对应mq的偏移量
                     if (offsetSerializeWrapper != null && offsetSerializeWrapper.getOffsetTable() != null) {
                         AtomicLong offset = offsetSerializeWrapper.getOffsetTable().get(mq);
                         if (offset != null) {
+                            //更新此mq的offset，并且存入本地offsetTable缓存
                             this.updateOffset(mq, offset.get(), false);
                             return offset.get();
                         }
@@ -163,7 +195,7 @@ public class LocalFileOffsetStore implements OffsetStore {
 
     @Override
     public void updateConsumeOffsetToBroker(final MessageQueue mq, final long offset, final boolean isOneway)
-        throws RemotingException, MQBrokerException, InterruptedException, MQClientException {
+            throws RemotingException, MQBrokerException, InterruptedException, MQClientException {
 
     }
 
@@ -194,7 +226,7 @@ public class LocalFileOffsetStore implements OffsetStore {
             OffsetSerializeWrapper offsetSerializeWrapper = null;
             try {
                 offsetSerializeWrapper =
-                    OffsetSerializeWrapper.fromJson(content, OffsetSerializeWrapper.class);
+                        OffsetSerializeWrapper.fromJson(content, OffsetSerializeWrapper.class);
             } catch (Exception e) {
                 log.warn("readLocalOffset Exception, and try to correct", e);
                 return this.readLocalOffsetBak();
@@ -215,12 +247,12 @@ public class LocalFileOffsetStore implements OffsetStore {
             OffsetSerializeWrapper offsetSerializeWrapper = null;
             try {
                 offsetSerializeWrapper =
-                    OffsetSerializeWrapper.fromJson(content, OffsetSerializeWrapper.class);
+                        OffsetSerializeWrapper.fromJson(content, OffsetSerializeWrapper.class);
             } catch (Exception e) {
                 log.warn("readLocalOffset Exception", e);
                 throw new MQClientException("readLocalOffset Exception, maybe fastjson version too low"
-                    + FAQUrl.suggestTodo(FAQUrl.LOAD_JSON_EXCEPTION),
-                    e);
+                        + FAQUrl.suggestTodo(FAQUrl.LOAD_JSON_EXCEPTION),
+                        e);
             }
             return offsetSerializeWrapper;
         }

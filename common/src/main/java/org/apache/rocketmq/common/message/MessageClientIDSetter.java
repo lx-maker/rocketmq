@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.rocketmq.common.UtilAll;
 
 public class MessageClientIDSetter {
@@ -118,7 +119,7 @@ public class MessageClientIDSetter {
         if (current >= nextStartTime) {
             setStartTime(current);
         }
-        int diff = (int)(current - startTime);
+        int diff = (int) (current - startTime);
         if (diff < 0 && diff > -1000_000) {
             // may cause by NTP
             diff = 0;
@@ -130,7 +131,11 @@ public class MessageClientIDSetter {
         return new String(sb);
     }
 
+    /**
+     * MessageClientIDSetter的方法
+     */
     public static void setUniqID(final Message msg) {
+        //如果这条消息不存在"UNIQ_KEY"属性，那么创建uniqId并且存入"UNIQ_KEY"属性中
         if (msg.getProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX) == null) {
             msg.putProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX, createUniqID());
         }

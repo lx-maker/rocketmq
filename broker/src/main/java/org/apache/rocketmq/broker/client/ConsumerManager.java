@@ -17,12 +17,14 @@
 package org.apache.rocketmq.broker.client;
 
 import io.netty.channel.Channel;
+
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
 import org.apache.rocketmq.logging.InternalLogger;
@@ -37,7 +39,7 @@ public class ConsumerManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private static final long CHANNEL_EXPIRED_TIMEOUT = 1000 * 120;
     private final ConcurrentMap<String/* Group */, ConsumerGroupInfo> consumerTable =
-        new ConcurrentHashMap<String, ConsumerGroupInfo>(1024);
+            new ConcurrentHashMap<String, ConsumerGroupInfo>(1024);
     private final ConsumerIdsChangeListener consumerIdsChangeListener;
 
     public ConsumerManager(final ConsumerIdsChangeListener consumerIdsChangeListener) {
@@ -85,7 +87,7 @@ public class ConsumerManager {
                     ConsumerGroupInfo remove = this.consumerTable.remove(next.getKey());
                     if (remove != null) {
                         log.info("unregister consumer ok, no any connection, and remove consumer group, {}",
-                            next.getKey());
+                                next.getKey());
                         this.consumerIdsChangeListener.handle(ConsumerGroupEvent.UNREGISTER, next.getKey());
                     }
                 }
@@ -95,35 +97,59 @@ public class ConsumerManager {
         }
     }
 
+    /**
+     * ConsumerManager的方法
+     * <p>
+     * 注册consumer，返回consumer信息是否已发生改变
+     * 如果发生了改变，Broker会发送NOTIFY_CONSUMER_IDS_CHANGED请求给同组的所有consumer客户端，要求进行重平衡操作
+     *
+     * @param group                            消费者组
+     * @param clientChannelInfo                客户端连接信息
+     * @param consumeType                      消费类型，PULL or PUSH
+     * @param messageModel                     消息模式，集群 or 广播
+     * @param consumeFromWhere                 启动消费位置
+     * @param subList                          订阅信息数据
+     * @param isNotifyConsumerIdsChangedEnable 一个consumer改变时是否通知该consumergroup中的所有consumer进行重平衡
+     * @return 是否重平衡
+     */
     public boolean registerConsumer(final String group, final ClientChannelInfo clientChannelInfo,
-        ConsumeType consumeType, MessageModel messageModel, ConsumeFromWhere consumeFromWhere,
-        final Set<SubscriptionData> subList, boolean isNotifyConsumerIdsChangedEnable) {
-
+                                    ConsumeType consumeType, MessageModel messageModel, ConsumeFromWhere consumeFromWhere,
+                                    final Set<SubscriptionData> subList, boolean isNotifyConsumerIdsChangedEnable) {
+        //获取当前group对应的ConsumerGroupInfo
         ConsumerGroupInfo consumerGroupInfo = this.consumerTable.get(group);
+        //如果为null，那么新建一个ConsumerGroupInfo并存入consumerTable
         if (null == consumerGroupInfo) {
             ConsumerGroupInfo tmp = new ConsumerGroupInfo(group, consumeType, messageModel, consumeFromWhere);
             ConsumerGroupInfo prev = this.consumerTable.putIfAbsent(group, tmp);
             consumerGroupInfo = prev != null ? prev : tmp;
         }
-
+        /*
+         * 1 更新连接
+         */
         boolean r1 =
-            consumerGroupInfo.updateChannel(clientChannelInfo, consumeType, messageModel,
-                consumeFromWhere);
+                consumerGroupInfo.updateChannel(clientChannelInfo, consumeType, messageModel,
+                        consumeFromWhere);
+        /*
+         * 2 更新订阅信息
+         */
         boolean r2 = consumerGroupInfo.updateSubscription(subList);
-
+        /*
+         * 2 如果连接或者订阅信息有更新，并且允许通知，那么通知该consumergroup中的所有consumer进行重平衡
+         */
         if (r1 || r2) {
             if (isNotifyConsumerIdsChangedEnable) {
+                //CHANGE事件
                 this.consumerIdsChangeListener.handle(ConsumerGroupEvent.CHANGE, group, consumerGroupInfo.getAllChannel());
             }
         }
-
+        //注册订阅信息到ConsumerFilterManager
         this.consumerIdsChangeListener.handle(ConsumerGroupEvent.REGISTER, group, subList);
 
         return r1 || r2;
     }
 
     public void unregisterConsumer(final String group, final ClientChannelInfo clientChannelInfo,
-        boolean isNotifyConsumerIdsChangedEnable) {
+                                   boolean isNotifyConsumerIdsChangedEnable) {
         ConsumerGroupInfo consumerGroupInfo = this.consumerTable.get(group);
         if (null != consumerGroupInfo) {
             consumerGroupInfo.unregisterChannel(clientChannelInfo);
@@ -148,7 +174,7 @@ public class ConsumerManager {
             String group = next.getKey();
             ConsumerGroupInfo consumerGroupInfo = next.getValue();
             ConcurrentMap<Channel, ClientChannelInfo> channelInfoTable =
-                consumerGroupInfo.getChannelInfoTable();
+                    consumerGroupInfo.getChannelInfoTable();
 
             Iterator<Entry<Channel, ClientChannelInfo>> itChannel = channelInfoTable.entrySet().iterator();
             while (itChannel.hasNext()) {
@@ -157,8 +183,8 @@ public class ConsumerManager {
                 long diff = System.currentTimeMillis() - clientChannelInfo.getLastUpdateTimestamp();
                 if (diff > CHANNEL_EXPIRED_TIMEOUT) {
                     log.warn(
-                        "SCAN: remove expired channel from ConsumerManager consumerTable. channel={}, consumerGroup={}",
-                        RemotingHelper.parseChannelRemoteAddr(clientChannelInfo.getChannel()), group);
+                            "SCAN: remove expired channel from ConsumerManager consumerTable. channel={}, consumerGroup={}",
+                            RemotingHelper.parseChannelRemoteAddr(clientChannelInfo.getChannel()), group);
                     RemotingUtil.closeChannel(clientChannelInfo.getChannel());
                     itChannel.remove();
                 }
@@ -166,8 +192,8 @@ public class ConsumerManager {
 
             if (channelInfoTable.isEmpty()) {
                 log.warn(
-                    "SCAN: remove expired channel from ConsumerManager consumerTable, all clear, consumerGroup={}",
-                    group);
+                        "SCAN: remove expired channel from ConsumerManager consumerTable, all clear, consumerGroup={}",
+                        group);
                 it.remove();
             }
         }
@@ -179,7 +205,7 @@ public class ConsumerManager {
         while (it.hasNext()) {
             Entry<String, ConsumerGroupInfo> entry = it.next();
             ConcurrentMap<String, SubscriptionData> subscriptionTable =
-                entry.getValue().getSubscriptionTable();
+                    entry.getValue().getSubscriptionTable();
             if (subscriptionTable.containsKey(topic)) {
                 groups.add(entry.getKey());
             }

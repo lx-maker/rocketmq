@@ -22,6 +22,7 @@ import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+
 import org.apache.rocketmq.client.common.ThreadLocalIndex;
 
 public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> {
@@ -29,20 +30,32 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
 
     private final ThreadLocalIndex whichItemWorst = new ThreadLocalIndex();
 
+    /**
+     * LatencyFaultToleranceImpl的方法
+     *
+     * @param name                 brokerName
+     * @param currentLatency       当前延迟
+     * @param notAvailableDuration 隔离时间（不可用时间）
+     */
     @Override
     public void updateFaultItem(final String name, final long currentLatency, final long notAvailableDuration) {
+        //获取该broker此前的故障记录数据
         FaultItem old = this.faultItemTable.get(name);
+        //如果此前没有数据，那么设置一个新对象肌凝乳
         if (null == old) {
             final FaultItem faultItem = new FaultItem(name);
+            //设置当前延迟
             faultItem.setCurrentLatency(currentLatency);
+            //设置下一次可用时间点
             faultItem.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
-
+            //已有故障记录，更新
             old = this.faultItemTable.putIfAbsent(name, faultItem);
             if (old != null) {
                 old.setCurrentLatency(currentLatency);
                 old.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
             }
         } else {
+            //已有故障记录，更新
             old.setCurrentLatency(currentLatency);
             old.setStartTimestamp(System.currentTimeMillis() + notAvailableDuration);
         }
@@ -72,8 +85,9 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         }
 
         if (!tmpList.isEmpty()) {
+            //对集合元素进行随机洗牌
             Collections.shuffle(tmpList);
-
+            //对集合元素进行排序
             Collections.sort(tmpList);
 
             final int half = tmpList.size() / 2;
@@ -91,9 +105,9 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
     @Override
     public String toString() {
         return "LatencyFaultToleranceImpl{" +
-            "faultItemTable=" + faultItemTable +
-            ", whichItemWorst=" + whichItemWorst +
-            '}';
+                "faultItemTable=" + faultItemTable +
+                ", whichItemWorst=" + whichItemWorst +
+                '}';
     }
 
     class FaultItem implements Comparable<FaultItem> {
@@ -162,10 +176,10 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         @Override
         public String toString() {
             return "FaultItem{" +
-                "name='" + name + '\'' +
-                ", currentLatency=" + currentLatency +
-                ", startTimestamp=" + startTimestamp +
-                '}';
+                    "name='" + name + '\'' +
+                    ", currentLatency=" + currentLatency +
+                    ", startTimestamp=" + startTimestamp +
+                    '}';
         }
 
         public String getName() {

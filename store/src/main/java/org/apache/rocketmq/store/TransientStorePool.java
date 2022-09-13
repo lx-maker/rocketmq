@@ -44,16 +44,21 @@ public class TransientStorePool {
     }
 
     /**
+     * TransientStorePool的方法
+     *
      * It's a heavy init method.
      */
     public void init() {
+        //默认5个
         for (int i = 0; i < poolSize; i++) {
+            //分配堆外内存，默认大小1G
             ByteBuffer byteBuffer = ByteBuffer.allocateDirect(fileSize);
 
             final long address = ((DirectBuffer) byteBuffer).address();
             Pointer pointer = new Pointer(address);
+            //锁定堆外内存，确保不会被置换到虚拟内存中去
             LibC.INSTANCE.mlock(pointer, new NativeLong(fileSize));
-
+            //存入队列中
             availableBuffers.offer(byteBuffer);
         }
     }
@@ -80,10 +85,16 @@ public class TransientStorePool {
         return buffer;
     }
 
+    /**
+     * TransientStorePool的方法
+     * @return
+     */
     public int availableBufferNums() {
+        //如果启动，则返回可用的堆外内存池的数量
         if (storeConfig.isTransientStorePoolEnable()) {
             return availableBuffers.size();
         }
+        //如果没开启则返回最大int值
         return Integer.MAX_VALUE;
     }
 }

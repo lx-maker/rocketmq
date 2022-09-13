@@ -32,6 +32,7 @@ public class AllocateMessageQueueAveragelyByCircle implements AllocateMessageQue
     @Override
     public List<MessageQueue> allocate(String consumerGroup, String currentCID, List<MessageQueue> mqAll,
         List<String> cidAll) {
+        //参数校验
         if (currentCID == null || currentCID.length() < 1) {
             throw new IllegalArgumentException("currentCID is empty");
         }
@@ -50,8 +51,9 @@ public class AllocateMessageQueueAveragelyByCircle implements AllocateMessageQue
                 cidAll);
             return result;
         }
-
+        //索引
         int index = cidAll.indexOf(currentCID);
+        //获取每个分配轮次轮次中属于该消费者的对应的消息队列
         for (int i = index; i < mqAll.size(); i++) {
             if (i % cidAll.size() == index) {
                 result.add(mqAll.get(i));

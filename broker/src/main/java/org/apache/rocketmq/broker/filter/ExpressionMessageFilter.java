@@ -41,7 +41,7 @@ public class ExpressionMessageFilter implements MessageFilter {
     protected final boolean bloomDataValid;
 
     public ExpressionMessageFilter(SubscriptionData subscriptionData, ConsumerFilterData consumerFilterData,
-        ConsumerFilterManager consumerFilterManager) {
+                                   ConsumerFilterManager consumerFilterManager) {
         this.subscriptionData = subscriptionData;
         this.consumerFilterData = consumerFilterData;
         this.consumerFilterManager = consumerFilterManager;
@@ -57,32 +57,43 @@ public class ExpressionMessageFilter implements MessageFilter {
         }
     }
 
+    /**
+     * ExpressionMessageFilter的方法
+     * <p>
+     * 对于ConsumeQueue条目，通过tagsCode或bitmap filter进行tagsCode匹配
+     *
+     * @param tagsCode  tagsCode，延迟消息就是消息投递时间，普通消息的tags的hashCode，即生产者发送消息时设置的tags
+     * @param cqExtUnit 扩展消费队列单元，一般为null
+     * @return
+     */
     @Override
     public boolean isMatchedByConsumeQueue(Long tagsCode, ConsumeQueueExt.CqExtUnit cqExtUnit) {
+        //如果订阅信息对象为null，则返回true
         if (null == subscriptionData) {
             return true;
         }
-
+        //如果是classFilter模式的过滤，则返回true
         if (subscriptionData.isClassFilterMode()) {
             return true;
         }
 
-        // by tags code.
+        //如果是TAG类型的过滤子表达式
         if (ExpressionType.isTagType(subscriptionData.getExpressionType())) {
-
+            //如果tagsCode为null，则返回true
             if (tagsCode == null) {
                 return true;
             }
-
+            //如果订阅表达式为"*"，即表示订阅所有消息，那么返回true
             if (subscriptionData.getSubString().equals(SubscriptionData.SUB_ALL)) {
                 return true;
             }
-
+            //如果订阅关系对象的codeSet集合包含tagsCode值，表示子表达式订阅了该tag的消息，返回true，否则返回false
             return subscriptionData.getCodeSet().contains(tagsCode.intValue());
         } else {
+            //如果不是TAG类型，需要依靠BloomFilter，布隆过滤器来实现过滤
             // no expression or no bloom
             if (consumerFilterData == null || consumerFilterData.getExpression() == null
-                || consumerFilterData.getCompiledExpression() == null || consumerFilterData.getBloomFilterData() == null) {
+                    || consumerFilterData.getCompiledExpression() == null || consumerFilterData.getBloomFilterData() == null) {
                 return true;
             }
 
@@ -95,7 +106,7 @@ public class ExpressionMessageFilter implements MessageFilter {
             byte[] filterBitMap = cqExtUnit.getFilterBitMap();
             BloomFilter bloomFilter = this.consumerFilterManager.getBloomFilter();
             if (filterBitMap == null || !this.bloomDataValid
-                || filterBitMap.length * Byte.SIZE != consumerFilterData.getBloomFilterData().getBitNum()) {
+                    || filterBitMap.length * Byte.SIZE != consumerFilterData.getBloomFilterData().getBitNum()) {
                 return true;
             }
 
@@ -107,7 +118,7 @@ public class ExpressionMessageFilter implements MessageFilter {
                 return ret;
             } catch (Throwable e) {
                 log.error("bloom filter error, sub=" + subscriptionData
-                    + ", filter=" + consumerFilterData + ", bitMap=" + bitsArray, e);
+                        + ", filter=" + consumerFilterData + ", bitMap=" + bitsArray, e);
             }
         }
 
@@ -133,7 +144,7 @@ public class ExpressionMessageFilter implements MessageFilter {
 
         // no expression
         if (realFilterData == null || realFilterData.getExpression() == null
-            || realFilterData.getCompiledExpression() == null) {
+                || realFilterData.getCompiledExpression() == null) {
             return true;
         }
 

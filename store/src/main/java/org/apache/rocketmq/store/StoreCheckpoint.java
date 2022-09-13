@@ -38,17 +38,22 @@ public class StoreCheckpoint {
 
     public StoreCheckpoint(final String scpPath) throws IOException {
         File file = new File(scpPath);
+        //判断存在当前文件
         MappedFile.ensureDirOK(file.getParent());
         boolean fileExists = file.exists();
-
+        //对checkpoint文件同样执行mmap操作
         this.randomAccessFile = new RandomAccessFile(file, "rw");
         this.fileChannel = this.randomAccessFile.getChannel();
+        //mmap大小为OS_PAGE_SIZE，即OS一页，4k
         this.mappedByteBuffer = fileChannel.map(MapMode.READ_WRITE, 0, MappedFile.OS_PAGE_SIZE);
 
         if (fileExists) {
             log.info("store checkpoint file exists, " + scpPath);
+            //获取commitlog文件的时间戳，即最新commitlog文件的刷盘时间戳
             this.physicMsgTimestamp = this.mappedByteBuffer.getLong(0);
+            //获取consumeQueue文件的时间戳，即最新consumeQueue文件的刷盘时间戳
             this.logicsMsgTimestamp = this.mappedByteBuffer.getLong(8);
+            //获取index文件的时间戳，即创建最新indexfile文件的时间戳
             this.indexMsgTimestamp = this.mappedByteBuffer.getLong(16);
 
             log.info("store checkpoint file physicMsgTimestamp " + this.physicMsgTimestamp + ", "

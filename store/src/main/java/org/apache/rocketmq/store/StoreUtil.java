@@ -22,6 +22,11 @@ import java.lang.management.OperatingSystemMXBean;
 public class StoreUtil {
     public static final long TOTAL_PHYSICAL_MEMORY_SIZE = getTotalPhysicalMemorySize();
 
+    /**
+     * 固定的方法
+     *
+     * @return 获取当前服务器上以字节为单位的物理内存总量
+     */
     @SuppressWarnings("restriction")
     public static long getTotalPhysicalMemorySize() {
         long physicalTotal = 1024 * 1024 * 1024 * 24L;

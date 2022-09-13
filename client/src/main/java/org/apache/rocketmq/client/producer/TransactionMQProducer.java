@@ -17,6 +17,7 @@
 package org.apache.rocketmq.client.producer;
 
 import java.util.concurrent.ExecutorService;
+
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.protocol.NamespaceUtil;
@@ -55,9 +56,16 @@ public class TransactionMQProducer extends DefaultMQProducer {
         super(namespace, producerGroup, rpcHook, enableMsgTrace, customizedTraceTopic);
     }
 
+    /**
+     * TransactionMQProducer的方法
+     * <p>
+     * 启动事务消息生产者
+     */
     @Override
     public void start() throws MQClientException {
+        //初始化事务环境
         this.defaultMQProducerImpl.initTransactionEnv();
+        //父类DefaultMQProducer的start方法
         super.start();
     }
 
@@ -74,7 +82,7 @@ public class TransactionMQProducer extends DefaultMQProducer {
     @Override
     @Deprecated
     public TransactionSendResult sendMessageInTransaction(final Message msg,
-        final LocalTransactionExecuter tranExecuter, final Object arg) throws MQClientException {
+                                                          final LocalTransactionExecuter tranExecuter, final Object arg) throws MQClientException {
         if (null == this.transactionCheckListener) {
             throw new MQClientException("localTransactionBranchCheckListener is null", null);
         }
@@ -83,14 +91,23 @@ public class TransactionMQProducer extends DefaultMQProducer {
         return this.defaultMQProducerImpl.sendMessageInTransaction(msg, tranExecuter, arg);
     }
 
+    /**
+     * TransactionMQProducer的方法
+     *
+     * @param msg 要发送的事务消息
+     * @param arg 参与本地事务使用的参数
+     * @return 发送结果
+     */
     @Override
     public TransactionSendResult sendMessageInTransaction(final Message msg,
-        final Object arg) throws MQClientException {
+                                                          final Object arg) throws MQClientException {
+        //必须要右事务监听器
         if (null == this.transactionListener) {
             throw new MQClientException("TransactionListener is null", null);
         }
-
+        //根据namespace和topic设置主题，一般没有设置nameSpace
         msg.setTopic(NamespaceUtil.wrapNamespace(this.getNamespace(), msg.getTopic()));
+        //调用DefaultMQProducerImpl#sendMessageInTransaction方法发送事务消息
         return this.defaultMQProducerImpl.sendMessageInTransaction(msg, null, arg);
     }
 

@@ -19,6 +19,7 @@ package org.apache.rocketmq.store;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.rocketmq.store.stats.BrokerStatsManager;
 
 public class GetMessageResult {
@@ -87,12 +88,22 @@ public class GetMessageResult {
         return messageBufferList;
     }
 
+    /**
+     * GetMessageResult的方法
+     * <p>
+     * 添加消息
+     *
+     * @param mapedBuffer 消息buffer
+     */
     public void addMessage(final SelectMappedBufferResult mapedBuffer) {
+        //mapedBuffer加入到集合中
         this.messageMapedList.add(mapedBuffer);
+        //byteBuffer加入到集合中
         this.messageBufferList.add(mapedBuffer.getByteBuffer());
+        //已拉取的消息总大小加上当前消息的大小
         this.bufferTotalSize += mapedBuffer.getSize();
         this.msgCount4Commercial += (int) Math.ceil(
-            mapedBuffer.getSize() / BrokerStatsManager.SIZE_PER_COUNT);
+                mapedBuffer.getSize() / BrokerStatsManager.SIZE_PER_COUNT);
     }
 
     public void release() {
@@ -132,8 +143,8 @@ public class GetMessageResult {
     @Override
     public String toString() {
         return "GetMessageResult [status=" + status + ", nextBeginOffset=" + nextBeginOffset + ", minOffset="
-            + minOffset + ", maxOffset=" + maxOffset + ", bufferTotalSize=" + bufferTotalSize
-            + ", suggestPullingFromSlave=" + suggestPullingFromSlave + "]";
+                + minOffset + ", maxOffset=" + maxOffset + ", bufferTotalSize=" + bufferTotalSize
+                + ", suggestPullingFromSlave=" + suggestPullingFromSlave + "]";
     }
 
 }
